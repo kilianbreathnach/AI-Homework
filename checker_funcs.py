@@ -1,0 +1,227 @@
+# Function definitions for the checkers game in checkers.py
+
+
+def initialise_game():
+    S = [[0]*8 for _ in range(8)]
+    '''Board of zeroes'''
+
+    for a in range(8):
+
+        for b in range(3):
+            '''Top of board'''
+            if (a + b) % 2 != 0:
+                S[b, a] = 1
+                '''Red pieces'''
+
+        for b in [5, 6, 7]:
+            if (a+b) % 2 != 0:
+                S[b, a] = 2
+                '''Black pieces'''
+
+    return S
+
+
+def expand(S, RB):
+    list_of_moves = 0
+    jump = 0
+
+    for a in range(8):
+        for b in range(8):
+            if (a + b) % 2 == 1:
+                '''Check if piece is red or white.'''
+                if S[b][a] == 1 + RB or S[b][a] == 3 + RB:
+                    '''Exploit grid with red/white pieces.'''
+                    S, jump, list_of_moves = exploit_moves(S, a, b, jump,
+                                                           list_of_moves, RB)
+
+    if jump == 0 and list_of_moves != 0:
+        best = evaluate_moves(list_of_moves)
+        S = make_move(S, best[0], best[1], best[2], best[3], RB)
+    else:
+        S = 0
+
+    return S
+
+
+def make_move(S, a, b, aa, bb, RB):
+    piece = S[b][a]
+    S[b][a] = 0
+
+    if bb == 1 + 7 * (1 - RB) and piece == 1 + RB:
+        S[bb][aa] = 3 + RB
+    else:
+        S[bb][aa] = piece
+
+    return S
+
+
+def evaluate_moves(list_of_moves):
+    '''
+    Will refine this function later.
+    For now, just return first element.
+    '''
+    best = list_of_moves[0]
+
+    return best
+
+
+def exploit_moves(S, a, b, jump, list_of_moves, RB):
+    diagonal = [0,1]
+    '''0 for left, 1 for right; either forwards or backwards.'''
+    if S[b][a] == 3 + RB:
+        '''
+        If there is a king piece,
+        check the backward move.
+        '''
+        for j in diagonal:
+            ng = neighbour(a, b, j, RB, 0)
+            '''FB=0 check backwards'''
+            if ng != 0:
+                '''neighbour is inside board'''
+                S, jump, list_of_moves = check_move(S, a, b, ng[0], ng[1],
+                                                    j, jump, list_of_moves,
+                                                    RB, 0)
+
+    if S[b][a] == 1 + RB or S[b][a] == 3 +RB:
+        '''Make sure there is a piece to move forward.'''
+        for j in diagonal:
+            ng = neighbour(a, b, j, RG, 1)
+            '''FB=1 check forward.'''
+            if ng != 0:
+                '''Neighbour is inside the board.'''
+                S, jump, list_of_moves = check_move(S, a, b, ng[0], ng[1],
+                                                    j, jump, list_of_moves,
+                                                    RB, 1)
+
+    return S, jump, list_of_moves
+
+
+def neighbour(a, b, d, RB, FB):
+    '''
+    FB=1 for forward, 0 for backward
+    diagonal d is 0 or 1
+    These define the available spaces in an X around a square.
+    '''
+    neighbour = (RB + FB) % 2
+    '''
+    Gives 1 if red forward and black backward,
+    0 if red backward and black forward.
+    '''
+    if d == 0:
+        if neighbour:
+            neighbour_list(3)
+        else:
+            neighbour_list(1)
+    elif d == 1:
+        if neighbour:
+            neighbour_list(4)
+        else:
+            neighbour_list(2)
+
+
+def neighbour_list(a, b):
+    '''
+    In the Cartesian notation, we want n1(a,b)=(a-1,b-1), n2(a,b)=(a+1,b-1),
+    n3(a,b)=(a-1,b+1), n4(a,b)=(a+1,b+1) [going around clockwise from top-left]
+    while imposing boundary condition of remaining inside the board.
+    '''
+    nlist = []
+
+    if a-1 >= 0 and b-1 >= 0:
+        nlist += [[a-1, b-1]]
+    else:
+        nlist += [0]
+
+    if a+1 <= 7 and b+1 <= 7:
+        nlist += [[a-1, b+1]]
+    else:
+        nlist += [0]
+
+    if a-1 >= 0 and b+1 <= 7:
+        nlist += [[a-1, b+1]]
+    else:
+        nlist += [0]
+
+    if a+1 <= 7 and b+1 <= 7:
+        nlist += [[a+1, b+1]]
+    else:
+        nlist += [0]
+
+    return nlist
+
+
+def check_move(S, a, b, aa, bb, diagonal, jump, list_of_moves, RB, FB):
+    if S[bb,aa] == 0 and jump == 0:
+        '''There is an empty spot and no jump has occured.'''
+        SS = simulate_move(S, a, b, aa, bb, RB)
+        list_of_moves = list_update(SS, a, b, aa, bb, list_of_moves)
+
+    elif S[bb][aa] == 2 - RB or S[bb][aa] == 4 - RB:
+        '''Opposing piece in front making jump possible.'''
+        ng = neighbour(aa, bb, diagonal, RB, FB)
+        '''
+        Keep same direction "diagonal."
+        Neighbour must be on board and empty.
+        '''
+        if ng != 0 and S[ng[1],ng[0]] == 0:
+            if jump == 0:
+                jump = 1
+                '''Jump is obliged.'''
+                list_of_moves = 0
+                '''Initialise list of moves.'''
+            S, list_of_moves = make_jump(S, a, b, aa, bb, ng[0], ng[1],
+                                         jump, list_of_moves, RB)
+
+   return S, jump, list_of_moves
+
+
+def make_jump(S, a, b, aa, bb, aaa, bbb, jump, list_of_moves, RB):
+    piece = S[b][a]
+    S[b][a] = 0
+    '''Empty the spot previously occupied by the RB piece.'''
+    S[bb][aa] = 0
+    '''Empty the spot previously occupied by the RB-1 piece.'''
+    promotion = 0
+
+    if bbb == 1 + 7 * (1 - RB) and piece == 1 + RB:
+        '''King promotion for simple pieces.'''
+        promotion = 1
+        S[bbb][aaa] = 3 + RB
+    else:
+        S[bbb][aaa] = piece
+
+    list_of_moves = list_update(S, a, b, aaa, bbb, list_of_moves)
+
+    if promotion != 1:
+        '''If there was no promotion, must check if another jump is obliged.'''
+        S, jump, list_of_moves = exploit_moves(S, aaa, bbb, jump,
+                                               list_of_moves, RB)
+
+    return S, list_of_moves
+
+
+def simulate_move(S, a, b, aa, bb, RB):
+    SS = S
+    SS[b][a] = 0
+    '''Move piece to (aa,bb).'''
+    if bb == 1 + 7 * (1 - RB) and  S[b][a] == 1 + RB:
+        '''King promotion for simple pieces.'''
+        SS[bb][aa] = 3 + RB
+        '''Move to (aa,bb) and king promotion.'''
+    else:
+        SS[bb][aa] = S[b][a]
+
+    return SS
+
+
+def list_update(S, a, b, aaa, bbb, list_of_moves):
+    '''Function to update the list of moves.'''
+    candidate = [S, a, b, aaa, bbb]
+    if list_of_moves == 0:
+        list_of_moves = candidate
+    else:
+        list_of_moves += candidate
+
+    return list_of_moves
+
+
